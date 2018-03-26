@@ -1,0 +1,90 @@
+#![feature(nll, match_default_bindings, universal_impl_trait, conservative_impl_trait,
+           dyn_trait, const_fn, duration_extras)]
+#![windows_subsystem = "console"]
+
+extern crate byteorder;
+extern crate encoding;
+#[macro_use] extern crate failure;
+#[macro_use] extern crate lazy_static;
+extern crate libflate;
+
+mod error {
+    pub use failure::Error;
+    pub type Result<T> = ::std::result::Result<T, Error>;
+}
+
+mod archive;
+mod output;
+
+// Main method
+//////////////
+
+use std::env;
+use std::ffi::OsString;
+use std::fs::File;
+use std::io::stdin;
+use std::mem;
+use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::path::PathBuf;
+use std::process;
+use std::time::Instant;
+
+fn extract(path: PathBuf) -> error::Result<()> {
+    let mut file = File::open(&path)?;
+    let arc_type = archive::determine_archive_type(&mut file);
+    if let archive::ArchiveType::NotAnArchive = arc_type {
+        eprintln!("File '{}' is not a Danmakufu 0.12m or ph3 archive.", path.display());
+        return Ok(())
+    }
+
+    let mut output = output::OutputDir::for_path(&path)?;
+    println!("Extracting '{}' to '{}'...", path.display(), output.display_out_path());
+    let start_time = Instant::now();
+
+    match arc_type {
+        archive::ArchiveType::Archive_Ph3 =>
+            archive::extract_ph3(file, &mut output)?,
+        archive::ArchiveType::Archive_012M =>
+            archive::extract_012m(file, &mut output)?,
+        _ => unreachable!(),
+    }
+
+    let total_time = Instant::now().duration_since(start_time);
+    println!("Extracted {} files in {} ms.", output.write_count(),
+             total_time.as_secs() * 1000 + total_time.subsec_millis() as u64);
+    Ok(())
+}
+
+fn press_any_key() {
+    eprint!("Press Enter to continue... ");
+    stdin().read_line(&mut String::new()).unwrap();
+}
+
+fn main() {
+    env::set_var("RUST_BACKTRACE", "1");
+
+    let mut args: Vec<OsString> = env::args_os().collect();
+    if args.len() != 2 {
+        eprintln!("Usage: {} [archive to extract]", args[0].to_string_lossy());
+        process::exit(1)
+    }
+    let target_file = args.pop().unwrap();
+    mem::drop(args);
+    let path = PathBuf::from(target_file);
+    if !path.exists() {
+        eprintln!("No such file '{}' exists.", path.display());
+        process::exit(1)
+    }
+    if !path.is_file() {
+        eprintln!("'{}' is not a regular file.", path.display());
+        process::exit(1)
+    }
+    match catch_unwind(AssertUnwindSafe(|| extract(path))) {
+        Ok(Ok(())) | Err(_) => press_any_key(),
+        Ok(Err(err)) => {
+            eprintln!("Error: {}\n{}", err, err.backtrace());
+            press_any_key();
+            process::exit(1)
+        }
+    }
+}

@@ -1,0 +1,15 @@
+[package]
+name = "dmf_extractor"
+version = "3.0.0-dev"
+authors = ["Lymia Aluysia <lymia@lymiahugs.com>"]
+
+[profile.release]
+opt-level = 3
+lto = true
+
+[dependencies]
+byteorder = "1.0"
+encoding = "0.2"
+failure = { version = "0.1", features = ["backtrace"] }
+lazy_static = "1.0"
+libflate = "0.1.14"
