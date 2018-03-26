@@ -1,6 +1,6 @@
 [package]
-name = "dmf_extractor"
-version = "3.0.0-dev"
+name = "th_dnh_archiver"
+version = "3.0.0"
 authors = ["Lymia Aluysia <lymia@lymiahugs.com>"]
 
 [profile.release]
