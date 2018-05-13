@@ -1,5 +1,4 @@
-#![feature(nll, match_default_bindings, universal_impl_trait, conservative_impl_trait,
-           dyn_trait, const_fn, duration_extras)]
+#![feature(nll)]
 #![windows_subsystem = "console"]
 
 extern crate byteorder;
