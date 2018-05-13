@@ -82,7 +82,7 @@ fn read_cstr(mut read: impl Read) -> Result<String> {
     }
 
     match from_utf8(&vec) {
-        Ok(rstr) => Ok(rstr.to_owned()),
+        Ok(rstr) => Ok(rstr.to_string()),
         Err(_) => {
             match Windows31JEncoding.decode(&vec, DecoderTrap::Strict) {
                 Ok(rstr) => Ok(rstr),
@@ -149,7 +149,7 @@ fn extract_ph3_inner(
 ) -> Result<()> {
     for _ in 0..file_count {
         let _entry_len = header_stream.read_u32::<LE>()? as u64;
-        let dir_name = read_wchar_str(&mut header_stream)?; // TODO: Handle directories.
+        let dir_name = read_wchar_str(&mut header_stream)?;
         let entry_name = read_wchar_str(&mut header_stream)?;
         let is_compressed = header_stream.read_u32::<LE>()? != 0;
         let uncompressed_len = header_stream.read_u32::<LE>()? as u64;
