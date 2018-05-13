@@ -38,8 +38,10 @@ pub fn determine_archive_type(mut read: impl Read + Seek) -> ArchiveType {
     }
 }
 
-fn transfer(out: &mut OutputDir, name: &str, mut read: impl Read, size: u64) -> Result<()> {
-    let mut write = out.create(name)?;
+fn transfer(
+    out: &mut Output, dir: &str, name: &str, mut read: impl Read, size: u64,
+) -> Result<()> {
+    let mut write = out.create(dir, name)?;
 
     let mut buffer = [0u8; 1024 * 64];
     let mut remaining = size;
@@ -96,7 +98,7 @@ fn read_cstr(mut read: impl Read) -> Result<String> {
 struct FileEntry {
     name: String, offset: u64, len: u64,
 }
-pub fn extract_012m(file: File, out: &mut OutputDir) -> Result<()> {
+pub fn extract_012m(file: File, out: &mut Output) -> Result<()> {
     let mut file = BufReader::new(file);
 
     assert!(check_archive_header(&mut file, ARCHIVE_012M_MAGIC)?);
@@ -115,11 +117,11 @@ pub fn extract_012m(file: File, out: &mut OutputDir) -> Result<()> {
             let uncompressed_len = file.read_u32::<LE>()? as u64;
             let compressed_len = len - 4 - COMPRESS_ZIP_MAGIC.len() as u64;
             let in_stream = (&mut file).take(compressed_len);
-            transfer(out, &name, ZlibDecoder::new(in_stream)?, uncompressed_len)?;
+            transfer(out, "", &name, ZlibDecoder::new(in_stream)?, uncompressed_len)?;
         } else {
             file.seek(SeekFrom::Start(offset))?;
             let in_stream = (&mut file).take(len);
-            transfer(out, &name, in_stream, len)?;
+            transfer(out, "", &name, in_stream, len)?;
         }
     }
 
@@ -143,11 +145,11 @@ fn read_wchar_str(mut read: impl Read) -> Result<String> {
 }
 fn extract_ph3_inner(
     mut header_stream: impl Read, mut contents_stream: impl Read + Seek,
-    file_count: u32, out: &mut OutputDir,
+    file_count: u32, out: &mut Output,
 ) -> Result<()> {
     for _ in 0..file_count {
         let _entry_len = header_stream.read_u32::<LE>()? as u64;
-        let _dir_name = read_wchar_str(&mut header_stream)?; // TODO: Handle directories.
+        let dir_name = read_wchar_str(&mut header_stream)?; // TODO: Handle directories.
         let entry_name = read_wchar_str(&mut header_stream)?;
         let is_compressed = header_stream.read_u32::<LE>()? != 0;
         let uncompressed_len = header_stream.read_u32::<LE>()? as u64;
@@ -157,15 +159,15 @@ fn extract_ph3_inner(
         contents_stream.seek(SeekFrom::Start(offset))?;
         if is_compressed {
             let in_stream = (&mut contents_stream).take(compressed_len);
-            transfer(out, &entry_name, ZlibDecoder::new(in_stream)?, uncompressed_len)?;
+            transfer(out, &dir_name, &entry_name, ZlibDecoder::new(in_stream)?, uncompressed_len)?;
         } else {
             let in_stream = (&mut contents_stream).take(uncompressed_len);
-            transfer(out, &entry_name, in_stream, uncompressed_len)?;
+            transfer(out, &dir_name, &entry_name, in_stream, uncompressed_len)?;
         }
     }
     Ok(())
 }
-pub fn extract_ph3(file: File, out: &mut OutputDir) -> Result<()> {
+pub fn extract_ph3(file: File, out: &mut Output) -> Result<()> {
     let mut file = BufReader::new(file);
 
     assert!(check_archive_header(&mut file, ARCHIVE_PH3_MAGIC)?);

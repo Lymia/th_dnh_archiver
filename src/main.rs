@@ -36,7 +36,7 @@ fn extract(path: PathBuf) -> error::Result<()> {
         return Ok(())
     }
 
-    let mut output = output::OutputDir::for_path(&path)?;
+    let mut output = output::Output::for_path(&path)?;
     println!("Extracting '{}' to '{}'...", path.display(), output.display_out_path());
     let start_time = Instant::now();
 
