@@ -187,7 +187,7 @@ dependencies = [
 
 [[package]]
 name = "th_dnh_archiver"
-version = "3.0.0"
+version = "3.0.1"
 dependencies = [
  "byteorder 1.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "encoding 0.2.33 (registry+https://github.com/rust-lang/crates.io-index)",

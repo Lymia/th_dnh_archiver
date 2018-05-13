@@ -1,6 +1,6 @@
 [package]
 name = "th_dnh_archiver"
-version = "3.0.0"
+version = "3.0.1"
 authors = ["Lymia Aluysia <lymia@lymiahugs.com>"]
 
 [profile.release]
