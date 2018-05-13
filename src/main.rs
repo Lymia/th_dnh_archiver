@@ -58,32 +58,38 @@ fn press_any_key() {
     eprint!("Press Enter to continue... ");
     stdin().read_line(&mut String::new()).unwrap();
 }
+fn after_error() {
+    press_any_key();
+    process::exit(1);
+}
 
 fn main() {
     env::set_var("RUST_BACKTRACE", "1");
 
     let mut args: Vec<OsString> = env::args_os().collect();
     if args.len() != 2 {
-        eprintln!("Usage: {} [archive to extract]", args[0].to_string_lossy());
-        process::exit(1)
+        eprintln!("To extract a .dat file, drag it onto {}.", args[0].to_string_lossy());
+        eprintln!("Alternatively, if you are using a terminal, please use: \
+                   {} [archive to extract]",
+                  args[0].to_string_lossy());
+        after_error();
     }
     let target_file = args.pop().unwrap();
     mem::drop(args);
     let path = PathBuf::from(target_file);
     if !path.exists() {
         eprintln!("No such file '{}' exists.", path.display());
-        process::exit(1)
+        after_error();
     }
     if !path.is_file() {
         eprintln!("'{}' is not a regular file.", path.display());
-        process::exit(1)
+        after_error();
     }
     match catch_unwind(AssertUnwindSafe(|| extract(path))) {
         Ok(Ok(())) | Err(_) => press_any_key(),
         Ok(Err(err)) => {
             eprintln!("Error: {}\n{}", err, err.backtrace());
-            press_any_key();
-            process::exit(1)
+            after_error();
         }
     }
 }
