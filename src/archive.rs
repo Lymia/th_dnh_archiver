@@ -3,7 +3,7 @@ use encoding::{DecoderTrap, Encoding};
 use encoding::codec::japanese::Windows31JEncoding;
 use error::*;
 use std::fs::File;
-use std::io::{Read, Write, Seek, BufReader, SeekFrom};
+use std::io::{Read, Write, Seek, BufReader, SeekFrom, Cursor};
 use std::str::from_utf8;
 use libflate::zlib::{Decoder as ZlibDecoder};
 use output::*;
@@ -93,29 +93,33 @@ fn read_cstr(mut read: impl Read) -> Result<String> {
         }
     }
 }
+struct FileEntry {
+    name: String, offset: u64, len: u64,
+}
 pub fn extract_012m(file: File, out: &mut OutputDir) -> Result<()> {
-    let mut header_stream = BufReader::new(file.try_clone()?);
-    let mut contents_stream = BufReader::new(file);
+    let mut file = BufReader::new(file);
 
-    assert!(check_archive_header(&mut header_stream, ARCHIVE_012M_MAGIC)?);
-    let file_count = header_stream.read_u32::<LE>()?;
+    assert!(check_archive_header(&mut file, ARCHIVE_012M_MAGIC)?);
+    let file_count = file.read_u32::<LE>()?;
 
+    let mut entries = Vec::new();
     for _ in 0..file_count {
-        let entry_name = read_cstr(&mut header_stream)?;
-        let offset = header_stream.read_u32::<LE>()? as u64;
-        let entry_len = header_stream.read_u32::<LE>()? as u64;
-
-        contents_stream.seek(SeekFrom::Start(offset))?;
-        if check_archive_header_no_seek(
-            &mut contents_stream, COMPRESS_ZIP_MAGIC
-        ).unwrap_or(false) {
-            let uncompressed_len = contents_stream.read_u32::<LE>()? as u64;
-            let compressed_len = entry_len - 4 - COMPRESS_ZIP_MAGIC.len() as u64;
-            let in_stream = (&mut contents_stream).take(compressed_len);
-            transfer(out, &entry_name, ZlibDecoder::new(in_stream)?, uncompressed_len)?;
+        let name = read_cstr(&mut file)?;
+        let offset = file.read_u32::<LE>()? as u64;
+        let len = file.read_u32::<LE>()? as u64;
+        entries.push(FileEntry { name, offset, len })
+    }
+    for FileEntry { name, offset, len } in entries {
+        file.seek(SeekFrom::Start(offset))?;
+        if check_archive_header_no_seek(&mut file, COMPRESS_ZIP_MAGIC).unwrap_or(false) {
+            let uncompressed_len = file.read_u32::<LE>()? as u64;
+            let compressed_len = len - 4 - COMPRESS_ZIP_MAGIC.len() as u64;
+            let in_stream = (&mut file).take(compressed_len);
+            transfer(out, &name, ZlibDecoder::new(in_stream)?, uncompressed_len)?;
         } else {
-            let in_stream = (&mut contents_stream).take(entry_len);
-            transfer(out, &entry_name, in_stream, entry_len)?;
+            file.seek(SeekFrom::Start(offset))?;
+            let in_stream = (&mut file).take(len);
+            transfer(out, &name, in_stream, len)?;
         }
     }
 
@@ -143,7 +147,7 @@ fn extract_ph3_inner(
 ) -> Result<()> {
     for _ in 0..file_count {
         let _entry_len = header_stream.read_u32::<LE>()? as u64;
-        let _unk = header_stream.read_u32::<LE>()?;
+        let _dir_name = read_wchar_str(&mut header_stream)?; // TODO: Handle directories.
         let entry_name = read_wchar_str(&mut header_stream)?;
         let is_compressed = header_stream.read_u32::<LE>()? != 0;
         let uncompressed_len = header_stream.read_u32::<LE>()? as u64;
@@ -162,18 +166,19 @@ fn extract_ph3_inner(
     Ok(())
 }
 pub fn extract_ph3(file: File, out: &mut OutputDir) -> Result<()> {
-    let mut header_stream = BufReader::new(file.try_clone()?);
-    let contents_stream = BufReader::new(file);
+    let mut file = BufReader::new(file);
 
-    assert!(check_archive_header(&mut header_stream, ARCHIVE_PH3_MAGIC)?);
-    let file_count = header_stream.read_u32::<LE>()?;
-    let is_compressed = header_stream.read_u8()? != 0;
-    let header_size = header_stream.read_u32::<LE>()? as u64;
+    assert!(check_archive_header(&mut file, ARCHIVE_PH3_MAGIC)?);
+    let file_count = file.read_u32::<LE>()?;
+    let is_compressed = file.read_u8()? != 0;
+    let header_size = file.read_u32::<LE>()? as u64;
+    assert!(header_size <= usize::max_value() as u64);
+    let mut header = vec![0u8; header_size as usize];
+    file.read_exact(&mut header)?;
 
     if is_compressed {
-        extract_ph3_inner(ZlibDecoder::new(header_stream.take(header_size))?,
-                          contents_stream, file_count, out)
+        extract_ph3_inner(ZlibDecoder::new(Cursor::new(header))?, file, file_count, out)
     } else {
-        extract_ph3_inner(header_stream, contents_stream, file_count, out)
+        extract_ph3_inner(Cursor::new(header), file, file_count, out)
     }
 }
