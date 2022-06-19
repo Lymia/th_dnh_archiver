@@ -68,7 +68,10 @@ fn main() {
 
     let mut args: Vec<OsString> = env::args_os().collect();
     if args.len() != 2 {
-        eprintln!("To extract a .dat file, drag it onto {}.", args[0].to_string_lossy());
+        eprintln!("To extract a .dat file, drag it onto {}.",
+                  args[0].to_string_lossy());
+        eprintln!("To create a .dat file, drag a single directory onto {}.",
+                  args[0].to_string_lossy());
         eprintln!("Alternatively, if you are using a terminal, please use: \
                    {} [archive to extract]",
                   args[0].to_string_lossy());

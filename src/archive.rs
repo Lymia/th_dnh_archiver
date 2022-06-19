@@ -1,12 +1,12 @@
 use byteorder::*;
 use encoding::{DecoderTrap, Encoding};
 use encoding::codec::japanese::Windows31JEncoding;
-use error::*;
+use crate::error::*;
 use std::fs::File;
 use std::io::{Read, Write, Seek, BufReader, SeekFrom, Cursor};
 use std::str::from_utf8;
 use libflate::zlib::{Decoder as ZlibDecoder};
-use output::*;
+use crate::output::*;
 
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug)]

@@ -1,4 +1,4 @@
-use error::*;
+use crate::error::*;
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
 use std::fmt::{Display, Write as FmtWrite};
@@ -8,10 +8,10 @@ use std::path::{Path, PathBuf};
 
 pub fn validate_filename(name: &str) -> String {
     let mut new_name = String::new();
-    for char in name.trim().trim_right_matches('.').chars() {
+    for char in name.trim().trim_end_matches('.').chars() {
         match char {
             '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => new_name.push('_'),
-            '\0' ... '\u{1F}' => new_name.push('_'),
+            '\0' ..= '\u{1F}' => new_name.push('_'),
             x => new_name.push(x),
         }
     }
