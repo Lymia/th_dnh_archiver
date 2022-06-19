@@ -1,4 +1,3 @@
-#![feature(nll)]
 #![windows_subsystem = "console"]
 
 extern crate byteorder;
