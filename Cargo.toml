@@ -11,6 +11,6 @@ lto = true
 [dependencies]
 byteorder = "1.0"
 encoding = "0.2"
-failure = { version = "0.1", features = ["backtrace"] }
+failure = { version = "0.1.8", features = ["backtrace"] }
 lazy_static = "1.0"
 libflate = "1.2"
