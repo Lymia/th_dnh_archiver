@@ -110,8 +110,8 @@ impl OutputDirNode {
         path_name: &mut String,
         original_name: &str,
     ) -> Result<&mut OutputDirNode> {
-        if let Some(node) = self.subdirs.get_mut(original_name) {
-            Ok(node)
+        if self.subdirs.contains_key(original_name) {
+            Ok(self.subdirs.get_mut(original_name).unwrap())
         } else {
             let mut path = self.base_path.clone();
             path.push(self.uniq_name(original_path, path_name.as_ref(), original_name)?);
