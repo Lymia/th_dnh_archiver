@@ -1,17 +1,19 @@
 use crate::error::*;
-use std::collections::{HashMap, HashSet};
-use std::ffi::OsString;
-use std::fmt::{Display, Write as FmtWrite};
-use std::fs::{File, create_dir_all};
-use std::io::{Write, BufWriter};
-use std::path::{Path, PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    ffi::OsString,
+    fmt::{Display, Write as FmtWrite},
+    fs::{create_dir_all, File},
+    io::{BufWriter, Write},
+    path::{Path, PathBuf},
+};
 
 pub fn validate_filename(name: &str) -> String {
     let mut new_name = String::new();
     for char in name.trim().trim_end_matches('.').chars() {
         match char {
             '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => new_name.push('_'),
-            '\0' ..= '\u{1F}' => new_name.push('_'),
+            '\0'..='\u{1F}' => new_name.push('_'),
             x => new_name.push(x),
         }
     }
@@ -20,10 +22,9 @@ pub fn validate_filename(name: &str) -> String {
         static ref INVALID_NAMES: HashSet<&'static str> = {
             let mut set = HashSet::new();
             for &i in &[
-                ".", "..",
-                "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6",
-                "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7",
-                "LPT8",
+                ".", "..", "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5",
+                "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6",
+                "LPT7", "LPT8",
             ] {
                 set.insert(i);
             }
@@ -51,19 +52,26 @@ fn normalize_path(path: &str) -> Vec<String> {
 }
 
 struct OutputDirNode {
-    base_path: PathBuf, subdirs: HashMap<String, OutputDirNode>,
-    encountered_names: HashSet<String>, written_names: HashSet<String>,
+    base_path: PathBuf,
+    subdirs: HashMap<String, OutputDirNode>,
+    encountered_names: HashSet<String>,
+    written_names: HashSet<String>,
 }
 impl OutputDirNode {
     fn new(base_path: PathBuf) -> OutputDirNode {
         OutputDirNode {
-            base_path, subdirs: HashMap::new(),
-            encountered_names: HashSet::new(), written_names: HashSet::new(),
+            base_path,
+            subdirs: HashMap::new(),
+            encountered_names: HashSet::new(),
+            written_names: HashSet::new(),
         }
     }
 
     fn uniq_name(
-        &mut self, original_path: &str, path_name: &str, original_name: &str,
+        &mut self,
+        original_path: &str,
+        path_name: &str,
+        original_name: &str,
     ) -> Result<String> {
         if !self.base_path.exists() {
             create_dir_all(&self.base_path)?;
@@ -85,7 +93,7 @@ impl OutputDirNode {
                 final_name = format!("{}_{}", name, suffix_count);
                 suffix_count += 1;
                 self.written_names.contains(&final_name)
-            } { }
+            } {}
             name = final_name;
         }
         if name != original_name {
@@ -97,7 +105,10 @@ impl OutputDirNode {
     }
 
     fn write_dir(
-        &mut self, original_path: &str, path_name: &mut String, original_name: &str,
+        &mut self,
+        original_path: &str,
+        path_name: &mut String,
+        original_name: &str,
     ) -> Result<&mut OutputDirNode> {
         if let Some(node) = self.subdirs.get_mut(original_name) {
             Ok(node)
@@ -106,13 +117,17 @@ impl OutputDirNode {
             path.push(self.uniq_name(original_path, path_name.as_ref(), original_name)?);
             create_dir_all(&path)?;
 
-            self.subdirs.insert(original_name.to_string(), OutputDirNode::new(path));
+            self.subdirs
+                .insert(original_name.to_string(), OutputDirNode::new(path));
             Ok(self.subdirs.get_mut(original_name).unwrap())
         }
     }
 
     fn write_file(
-        &mut self, original_path: &str, path_name: &str, original_name: &str,
+        &mut self,
+        original_path: &str,
+        path_name: &str,
+        original_name: &str,
     ) -> Result<impl Write> {
         let mut path = self.base_path.clone();
         path.push(self.uniq_name(original_path, path_name, original_name)?);
@@ -121,7 +136,8 @@ impl OutputDirNode {
 }
 
 pub struct Output {
-    root: OutputDirNode, written_files: usize,
+    root: OutputDirNode,
+    written_files: usize,
 }
 impl Output {
     pub fn for_path(path: impl AsRef<Path>) -> Result<Output> {
@@ -145,9 +161,7 @@ impl Output {
             base_path.set_file_name(&file_name);
             if !base_path.exists() {
                 create_dir_all(&base_path)?;
-                return Ok(Output {
-                    root: OutputDirNode::new(base_path), written_files: 0,
-                })
+                return Ok(Output { root: OutputDirNode::new(base_path), written_files: 0 });
             }
 
             file_name.clear();

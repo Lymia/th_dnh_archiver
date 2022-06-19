@@ -1,17 +1,19 @@
+use crate::{error::*, output::*};
 use byteorder::*;
-use encoding::{DecoderTrap, Encoding};
-use encoding::codec::japanese::Windows31JEncoding;
-use crate::error::*;
-use std::fs::File;
-use std::io::{Read, Write, Seek, BufReader, SeekFrom, Cursor};
-use std::str::from_utf8;
-use libflate::zlib::{Decoder as ZlibDecoder};
-use crate::output::*;
+use encoding::{codec::japanese::Windows31JEncoding, DecoderTrap, Encoding};
+use libflate::zlib::Decoder as ZlibDecoder;
+use std::{
+    fs::File,
+    io::{BufReader, Cursor, Read, Seek, SeekFrom, Write},
+    str::from_utf8,
+};
 
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug)]
 pub enum ArchiveType {
-    Archive_012M, Archive_Ph3, NotAnArchive,
+    Archive_012M,
+    Archive_Ph3,
+    NotAnArchive,
 }
 
 const ARCHIVE_012M_MAGIC: &[u8] = b"PACK_FILE\0";
@@ -38,9 +40,7 @@ pub fn determine_archive_type(mut read: impl Read + Seek) -> ArchiveType {
     }
 }
 
-fn transfer(
-    out: &mut Output, dir: &str, name: &str, mut read: impl Read, size: u64,
-) -> Result<()> {
+fn transfer(out: &mut Output, dir: &str, name: &str, mut read: impl Read, size: u64) -> Result<()> {
     let mut write = out.create(dir, name)?;
 
     let mut buffer = [0u8; 1024 * 64];
@@ -49,10 +49,14 @@ fn transfer(
         let read_bytes = read.read(&mut buffer)?;
         if read_bytes == 0 {
             if remaining > 0 {
-                eprintln!("WARNING: Entry '{}' ended prematurely. (expected {} bytes, got {})",
-                          name, size, size - remaining);
+                eprintln!(
+                    "WARNING: Entry '{}' ended prematurely. (expected {} bytes, got {})",
+                    name,
+                    size,
+                    size - remaining
+                );
             }
-            break
+            break;
         } else if read_bytes as u64 > remaining {
             write.write_all(&buffer[..remaining as usize])?;
             remaining = 0;
@@ -64,8 +68,11 @@ fn transfer(
 
     let is_eof = read.read(&mut buffer[0..1])? == 0;
     if !is_eof {
-        eprintln!("WARNING: Entry '{}' contains more data than header suggests. \
-                   Truncating at {} bytes.", name, size);
+        eprintln!(
+            "WARNING: Entry '{}' contains more data than header suggests. \
+                   Truncating at {} bytes.",
+            name, size
+        );
     }
 
     Ok(())
@@ -77,26 +84,29 @@ fn read_cstr(mut read: impl Read) -> Result<String> {
     let mut zero_encountered = false;
     for _ in 0..size {
         let byte = read.read_u8()?;
-        if byte == 0 || zero_encountered { zero_encountered = true }
-        else { vec.push(byte) }
+        if byte == 0 || zero_encountered {
+            zero_encountered = true
+        } else {
+            vec.push(byte)
+        }
     }
 
     match from_utf8(&vec) {
         Ok(rstr) => Ok(rstr.to_string()),
-        Err(_) => {
-            match Windows31JEncoding.decode(&vec, DecoderTrap::Strict) {
-                Ok(rstr) => Ok(rstr),
-                Err(_) => {
-                    let rstr = String::from_utf8_lossy(&vec);
-                    eprintln!("WARNING: Entry '{}' has an invalid UTF-8 or SJIS name.", rstr);
-                    Ok(rstr.to_string())
-                }
+        Err(_) => match Windows31JEncoding.decode(&vec, DecoderTrap::Strict) {
+            Ok(rstr) => Ok(rstr),
+            Err(_) => {
+                let rstr = String::from_utf8_lossy(&vec);
+                eprintln!("WARNING: Entry '{}' has an invalid UTF-8 or SJIS name.", rstr);
+                Ok(rstr.to_string())
             }
-        }
+        },
     }
 }
 struct FileEntry {
-    name: String, offset: u64, len: u64,
+    name: String,
+    offset: u64,
+    len: u64,
 }
 pub fn extract_012m(file: File, out: &mut Output) -> Result<()> {
     let mut file = BufReader::new(file);
@@ -144,8 +154,10 @@ fn read_wchar_str(mut read: impl Read) -> Result<String> {
     }
 }
 fn extract_ph3_inner(
-    mut header_stream: impl Read, mut contents_stream: impl Read + Seek,
-    file_count: u32, out: &mut Output,
+    mut header_stream: impl Read,
+    mut contents_stream: impl Read + Seek,
+    file_count: u32,
+    out: &mut Output,
 ) -> Result<()> {
     for _ in 0..file_count {
         let _entry_len = header_stream.read_u32::<LE>()? as u64;
