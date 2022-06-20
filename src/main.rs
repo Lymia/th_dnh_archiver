@@ -1,15 +1,12 @@
 #![windows_subsystem = "console"]
 
-extern crate byteorder;
-extern crate encoding;
 #[macro_use]
-extern crate failure;
+extern crate anyhow;
 #[macro_use]
 extern crate lazy_static;
-extern crate libflate;
 
 mod error {
-    pub use failure::Error;
+    pub use anyhow::Error;
     pub type Result<T> = ::std::result::Result<T, Error>;
 }
 
